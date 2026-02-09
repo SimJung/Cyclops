@@ -367,7 +367,7 @@ class MacroApp:
         self.scale = scale
         self.root = tk.Tk()
         self.root.title("autoSword - OCR Macro")
-        self.root.geometry("450x420")
+        self.root.geometry("500x480")
         self.root.resizable(False, False)
 
         self.controller = MacroController(scale)
@@ -383,6 +383,7 @@ class MacroApp:
         self.lbl_attempts = None
         self.lbl_last_ocr = None
 
+        self._result_region_img = None
         self.msg_queue = queue.Queue()
 
         self._build_gui()
@@ -422,7 +423,13 @@ class MacroApp:
             row1, text="Set Region",
             command=self._on_set_result_region, width=16,
         )
-        self.btn_result_region.pack(side=tk.LEFT, padx=(5, 10))
+        self.btn_result_region.pack(side=tk.LEFT, padx=(5, 5))
+        self.btn_preview_region = tk.Button(
+            row1, text="Preview",
+            command=self._preview_result_region, width=8,
+            state=tk.DISABLED,
+        )
+        self.btn_preview_region.pack(side=tk.LEFT, padx=(0, 10))
         self.lbl_result_region = self._make_info_btn(row1, "--")
         self.lbl_result_region.pack(side=tk.LEFT)
 
@@ -585,15 +592,19 @@ class MacroApp:
             self.controller.result_region = region
             x, y, w, h = region
             self._set_label(self.lbl_result_region, f"[OK] ({x},{y}) {w}x{h}")
-            # preview the captured region
-            img = capture_region(x, y, w, h)
-            preview_path = os.path.join(tempfile.gettempdir(), "autosword_region_preview.png")
-            img.save(preview_path)
-            open_file(preview_path)
+            self._result_region_img = capture_region(x, y, w, h)
+            self.btn_preview_region.config(state=tk.NORMAL)
         else:
             self._set_label(self.lbl_result_region, "-- cancelled --")
         self.root.deiconify()
         self.root.lift()
+
+    def _preview_result_region(self):
+        if self._result_region_img is None:
+            return
+        preview_path = os.path.join(tempfile.gettempdir(), "autosword_region_preview.png")
+        self._result_region_img.save(preview_path)
+        open_file(preview_path)
 
     def _on_set_click_image(self):
         region = self.selector.select(restore_window=False)
@@ -603,7 +614,6 @@ class MacroApp:
             self.controller.click_image = img
             self._set_label(self.lbl_click_image, f"[OK] {w}x{h}")
             self.btn_preview.config(state=tk.NORMAL)
-            self._preview_click_image()
         else:
             self._set_label(self.lbl_click_image, "-- cancelled --")
         self.root.deiconify()
@@ -655,6 +665,7 @@ class MacroApp:
         self.btn_start.config(state=tk.DISABLED)
         self.btn_stop.config(state=tk.NORMAL)
         self.btn_result_region.config(state=tk.DISABLED)
+        self.btn_preview_region.config(state=tk.DISABLED)
         self.btn_click_image.config(state=tk.DISABLED)
         self.btn_preview.config(state=tk.DISABLED)
         self.btn_set_text.config(state=tk.DISABLED)
@@ -682,6 +693,8 @@ class MacroApp:
         self.btn_start.config(state=tk.NORMAL)
         self.btn_stop.config(state=tk.DISABLED)
         self.btn_result_region.config(state=tk.NORMAL)
+        if self._result_region_img is not None:
+            self.btn_preview_region.config(state=tk.NORMAL)
         self.btn_click_image.config(state=tk.NORMAL)
         if self.controller.click_image is not None:
             self.btn_preview.config(state=tk.NORMAL)
