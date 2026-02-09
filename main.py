@@ -367,7 +367,7 @@ class MacroApp:
         self.scale = scale
         self.root = tk.Tk()
         self.root.title("autoSword - OCR Macro")
-        self.root.geometry("500x480")
+        self.root.geometry("600x580" if IS_WIN else "500x480")
         self.root.resizable(False, False)
 
         self.controller = MacroController(scale)
