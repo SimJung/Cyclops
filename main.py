@@ -57,13 +57,10 @@ def get_display_scale() -> float:
         logical_w = pyautogui.size()[0]
         return full.size[0] / logical_w
     else:
-        try:
-            import ctypes
-            ctypes.windll.shcore.SetProcessDpiAwareness(2)
-            scale = ctypes.windll.shcore.GetScaleFactorForDevice(0) / 100.0
-            return scale if scale >= 1.0 else 1.0
-        except Exception:
-            return 1.0
+        # Windows: DPI awareness를 설정하지 않으면
+        # ImageGrab, pyautogui, Tk 모두 논리 좌표를 사용하므로
+        # scale 1.0으로 통일하여 좌표 불일치를 방지
+        return 1.0
 
 
 def capture_region(x, y, w, h) -> Image.Image:
