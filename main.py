@@ -35,8 +35,8 @@ IMAGE_RETRY_INTERVAL = 0.5
 IMAGE_RETRY_MAX = 10
 
 
-SCREENSHOT_TMP = os.path.join(tempfile.gettempdir(), "autosword_screen.png")
-REGION_TMP = os.path.join(tempfile.gettempdir(), "autosword_region.png")
+SCREENSHOT_TMP = os.path.join(tempfile.gettempdir(), "Cyclops_screen.png")
+REGION_TMP = os.path.join(tempfile.gettempdir(), "Cyclops_region.png")
 
 
 def take_screenshot() -> Image.Image:
@@ -80,7 +80,7 @@ def ask_text_native(prompt: str) -> Optional[str]:
         script = (
             f'set userInput to text returned of '
             f'(display dialog "{prompt}" default answer "" '
-            f'with title "autoSword")'
+            f'with title "Cyclops")'
         )
         try:
             result = subprocess.run(
@@ -93,7 +93,7 @@ def ask_text_native(prompt: str) -> Optional[str]:
             pass
         return None
     else:
-        return simpledialog.askstring("autoSword", prompt)
+        return simpledialog.askstring("Cyclops", prompt)
 
 
 def open_file(path: str):
@@ -363,7 +363,7 @@ class MacroApp:
     def __init__(self, scale: float):
         self.scale = scale
         self.root = tk.Tk()
-        self.root.title("autoSword - OCR Macro")
+        self.root.title("Cyclops - OCR Macro")
         self.root.geometry("600x580" if IS_WIN else "500x480")
         self.root.resizable(False, False)
 
@@ -599,7 +599,7 @@ class MacroApp:
     def _preview_result_region(self):
         if self._result_region_img is None:
             return
-        preview_path = os.path.join(tempfile.gettempdir(), "autosword_region_preview.png")
+        preview_path = os.path.join(tempfile.gettempdir(), "Cyclops_region_preview.png")
         self._result_region_img.save(preview_path)
         open_file(preview_path)
 
@@ -620,7 +620,7 @@ class MacroApp:
         img = self.controller.click_image
         if img is None:
             return
-        preview_path = os.path.join(tempfile.gettempdir(), "autosword_preview.png")
+        preview_path = os.path.join(tempfile.gettempdir(), "Cyclops_preview.png")
         img.save(preview_path)
         open_file(preview_path)
 
