@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
 import queue
 import subprocess
 import tempfile
@@ -10,14 +10,20 @@ import os
 import sys
 from typing import Optional, Tuple
 
+IS_MAC = sys.platform == "darwin"
+IS_WIN = sys.platform == "win32"
+
 try:
     import pyautogui
     import pytesseract
-    from PIL import Image, ImageEnhance
+    from PIL import Image, ImageEnhance, ImageGrab
 except ImportError as e:
     print(f"Required packages missing: {e}")
     print("  pip install pyautogui pytesseract Pillow opencv-python-headless")
-    print("  brew install tesseract tesseract-lang")
+    if IS_MAC:
+        print("  brew install tesseract tesseract-lang")
+    else:
+        print("  Install tesseract: https://github.com/UB-Mannheim/tesseract/wiki")
     sys.exit(1)
 
 CLICK_DELAY = 3.0
@@ -30,53 +36,76 @@ IMAGE_RETRY_MAX = 10
 
 
 SCREENSHOT_TMP = os.path.join(tempfile.gettempdir(), "autosword_screen.png")
-
-
-def take_screenshot() -> Image.Image:
-    """Take screenshot using macOS screencapture to avoid Quartz thread deadlock."""
-    subprocess.run(
-        ["screencapture", "-x", SCREENSHOT_TMP],
-        capture_output=True, timeout=5,
-    )
-    img = Image.open(SCREENSHOT_TMP)
-    return img.copy()  # copy so file handle is released
-
-
-def get_retina_scale() -> float:
-    full = take_screenshot()
-    logical_w = pyautogui.size()[0]
-    return full.size[0] / logical_w
-
-
 REGION_TMP = os.path.join(tempfile.gettempdir(), "autosword_region.png")
 
 
+def take_screenshot() -> Image.Image:
+    if IS_MAC:
+        subprocess.run(
+            ["screencapture", "-x", SCREENSHOT_TMP],
+            capture_output=True, timeout=5,
+        )
+        img = Image.open(SCREENSHOT_TMP)
+        return img.copy()
+    else:
+        return ImageGrab.grab()
+
+
+def get_display_scale() -> float:
+    if IS_MAC:
+        full = take_screenshot()
+        logical_w = pyautogui.size()[0]
+        return full.size[0] / logical_w
+    else:
+        try:
+            import ctypes
+            ctypes.windll.shcore.SetProcessDpiAwareness(2)
+            scale = ctypes.windll.shcore.GetScaleFactorForDevice(0) / 100.0
+            return scale if scale >= 1.0 else 1.0
+        except Exception:
+            return 1.0
+
+
 def capture_region(x, y, w, h) -> Image.Image:
-    """Capture specific screen region using screencapture -R (handles Retina automatically)."""
-    subprocess.run(
-        ["screencapture", "-x", "-R", f"{x},{y},{w},{h}", REGION_TMP],
-        capture_output=True, timeout=5,
-    )
-    img = Image.open(REGION_TMP)
-    return img.copy()
+    if IS_MAC:
+        subprocess.run(
+            ["screencapture", "-x", "-R", f"{x},{y},{w},{h}", REGION_TMP],
+            capture_output=True, timeout=5,
+        )
+        img = Image.open(REGION_TMP)
+        return img.copy()
+    else:
+        return ImageGrab.grab(bbox=(x, y, x + w, y + h))
 
 
 def ask_text_native(prompt: str) -> Optional[str]:
-    script = (
-        f'set userInput to text returned of '
-        f'(display dialog "{prompt}" default answer "" '
-        f'with title "autoSword")'
-    )
-    try:
-        result = subprocess.run(
-            ["osascript", "-e", script],
-            capture_output=True, text=True, timeout=120,
+    if IS_MAC:
+        script = (
+            f'set userInput to text returned of '
+            f'(display dialog "{prompt}" default answer "" '
+            f'with title "autoSword")'
         )
-        if result.returncode == 0:
-            return result.stdout.strip()
-    except (subprocess.TimeoutExpired, Exception):
-        pass
-    return None
+        try:
+            result = subprocess.run(
+                ["osascript", "-e", script],
+                capture_output=True, text=True, timeout=120,
+            )
+            if result.returncode == 0:
+                return result.stdout.strip()
+        except (subprocess.TimeoutExpired, Exception):
+            pass
+        return None
+    else:
+        return simpledialog.askstring("autoSword", prompt)
+
+
+def open_file(path: str):
+    if IS_MAC:
+        subprocess.Popen(["open", path])
+    elif IS_WIN:
+        os.startfile(path)
+    else:
+        subprocess.Popen(["xdg-open", path])
 
 
 class RegionSelector:
@@ -560,7 +589,7 @@ class MacroApp:
             img = capture_region(x, y, w, h)
             preview_path = os.path.join(tempfile.gettempdir(), "autosword_region_preview.png")
             img.save(preview_path)
-            subprocess.Popen(["open", preview_path])
+            open_file(preview_path)
         else:
             self._set_label(self.lbl_result_region, "-- cancelled --")
         self.root.deiconify()
@@ -586,7 +615,7 @@ class MacroApp:
             return
         preview_path = os.path.join(tempfile.gettempdir(), "autosword_preview.png")
         img.save(preview_path)
-        subprocess.Popen(["open", preview_path])
+        open_file(preview_path)
 
     def _on_set_target_text(self):
         text = ask_text_native("Enter text to match:")
@@ -669,14 +698,17 @@ if __name__ == "__main__":
         pytesseract.get_tesseract_version()
     except pytesseract.TesseractNotFoundError:
         print("tesseract not installed.")
-        print("Run: brew install tesseract tesseract-lang")
+        if IS_MAC:
+            print("Run: brew install tesseract tesseract-lang")
+        else:
+            print("Download: https://github.com/UB-Mannheim/tesseract/wiki")
         sys.exit(1)
 
     pyautogui.FAILSAFE = True
     pyautogui.PAUSE = 0.1
 
-    print("Detecting Retina scale...")
-    scale = get_retina_scale()
+    print("Detecting display scale...")
+    scale = get_display_scale()
     print(f"Scale factor: {scale}x")
 
     app = MacroApp(scale)
